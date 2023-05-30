@@ -10,6 +10,7 @@
 #include "custom_error.c"
 
 #define BUF_SIZE 1024
+#define MAX_FD_SIZE FD_SETSIZE - 1
 
 int main(int argc, char** argv) {
   struct sockaddr_in server_addr, client_addr;
@@ -38,7 +39,7 @@ int main(int argc, char** argv) {
     exit(1);
   }
 
-  if (listen(sockfd, SOMAXCONN) < 0) {
+  if (listen(sockfd, MAX_FD_SIZE) < 0) {
     print_error("Server listen() failed");
     exit(1);
   }
@@ -61,7 +62,7 @@ int main(int argc, char** argv) {
 
     if (fd_num == 0) continue;
 
-    for (int i = 0; i <= fd_max; i++) {
+    for (int i = sockfd; i <= fd_max; i++) {
       if (!FD_ISSET(i, &rset)) continue;
       if (i == sockfd) {
         int addrlen = sizeof(client_addr);
@@ -78,21 +79,20 @@ int main(int argc, char** argv) {
 
         FD_SET(new_sockfd, &set);
         if (fd_max < new_sockfd) fd_max = new_sockfd;
-        inet_ntop(AF_INET, &client_addr.sin_addr, ip_address, addrlen);
-        printf("new client connected %s (%d)\n", ip_address, new_sockfd);
-        sprintf(welcome_message, "Welcome %s:%d!\n", ip_address, ntohs(client_addr.sin_port));
+        printf("Client connected %s (%d)\n", inet_ntoa(client_addr.sin_addr), new_sockfd);
+        sprintf(welcome_message, "Welcome %s:%d!\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
         send(new_sockfd, welcome_message, strlen(welcome_message), 0);
       } else {
         memset(buf, 0, sizeof(buf));
 
-        int bytes_recv = recv(i, buf, sizeof(buf), 0);
-        
+        int bytes_recv = recv(i, buf, sizeof(buf) - 1, 0);
         if (bytes_recv < 0) {
           print_error("Server recv() failed");
           exit(1);
         }
+
         if (bytes_recv == 0) {
-          printf("Client disconnected\n");
+          printf("Client %d disconnected\n");
           FD_CLR(i, &set);
           if (close(i) < 0) {
             print_error("Server close() failed");
@@ -101,9 +101,10 @@ int main(int argc, char** argv) {
           break;
         }
 
+        buf[bytes_recv] = '\0';
         printf("%s", buf);
 
-        for (int j = sockfd + 1; j <= fd_max; j++) {
+        for (int j = sockfd + 1; j <= fd_max; j++) { // broadcasting
           if (i == j) continue;
           if (send(j, buf, sizeof(buf), 0) < 0) {
             print_error("Server send() broadcast failed");
