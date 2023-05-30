@@ -78,7 +78,7 @@ int main(int argc, char** argv) {
 
     for (int i = 0; i <= fd_max; i++) {
       if (FD_ISSET(i, &rset)) { // 소켓 디스크립터에 변경이 있으면
-        if (i == sockfd) { // 서버 소켓
+        if (i == sockfd) { // 고정 서버 소켓
           addrlen = sizeof(client_addr);
           int new_sockfd = accept(sockfd, (struct sockaddr*)&client_addr, (socklen_t*)&addrlen);
           if (new_sockfd < 0) {
@@ -89,17 +89,17 @@ int main(int argc, char** argv) {
           printf("Client connected from %d\n", ntohs(client_addr.sin_port));
           FD_SET(new_sockfd, &set);
           if (fd_max < new_sockfd) fd_max = new_sockfd;
-        } else { // 클라이언트 소켓
+        } else { // 클라이언트 요청에 따라 새로 만들어진 서버 소켓
           printf("[Client %d] ", i);
           char buf[BUF_SIZE];
           int bytes_recv = recv(i, buf, sizeof(buf) - 1, 0);
-          printf("bytes_recv: %d\n", bytes_recv);
+          printf("bytes_re켓v: %d\n", bytes_recv);
           if (bytes_recv < 0) {
             print_error("Server recv() failed");
             exit(1);
           }
           if (bytes_recv == 0) {
-            FD_CLR(i, &rset);
+            FD_CLR(i, &set);
             if (close(i) < 0) {
               print_error("Server close() failed");
               exit(1);
