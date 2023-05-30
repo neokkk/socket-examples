@@ -9,7 +9,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "custom_error.c"
-#include "file.c"
 
 #define BUF_SIZE 1024
 #define MAX_FD_SIZE FD_SETSIZE - 1
