@@ -1,9 +1,9 @@
-#include <arpa/inet.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <unistd.h>
 #include "custom_error.c"
 
 #define BUF_SIZE 1024
@@ -42,7 +42,7 @@ void request_file(int fd, char* hostname, char* filepath) {
   int bytes_send;
 
   memset(buf, 0, sizeof(buf));
-  sprintf(buf, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: %s\r\nConnection: close\r\n\r\n", filepath, hostname, "webcli/1.0");
+  sprintf(buf, "GET %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: %s\r\nConnection: close\r\n\r\n", filepath, hostname, "webcli/1.0");
   printf("%s\n", buf);
 
   if ((bytes_send = send(fd, buf, strlen(buf), 0)) < 0) {
@@ -64,20 +64,19 @@ void parse_response(int fd, char* filepath) {
 
   while (1) { // 헤더 읽기
     char* last = fgets(buf, sizeof(buf), fp);
+
     if (!last) {
       print_error("Client fgets() failed");
       exit(1);
     }
 
-    if (*last == '\n' || *last == '\r') {
-      break;
-    }
+    if (*last == '\n' || *last == '\r') break;
 
-    char* header = strtok(buf, "\n");
+    char* header = strtok(buf, "\r\n");
     int status_code;
     long content_len;
 
-    printf("%s\n", header);
+    printf("%s", header);
 
     if (strncmp(header, "HTTP/", 5) == 0) {
       status_code = atoi(strchr(header, '/') + 5);
@@ -111,6 +110,9 @@ void parse_response(int fd, char* filepath) {
       exit(1);
     }
   }
+
+  fclose(fp);
+  fclose(new_fp);
 }
 
 int main(int argc, char** argv) {
@@ -126,6 +128,8 @@ int main(int argc, char** argv) {
   sockfd = connect_server(argv[1], atoi(argv[2]));
   request_file(sockfd, argv[1], argv[3]);
   parse_response(sockfd, argv[3]);
+
+  close(sockfd);
 
   return 0;
 }
